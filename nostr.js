@@ -1,137 +1,398 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>nostipedia - Nostr Wiki</title>
-    <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-    <header class="site-header">
-        <div class="header-content">
-            <h1 class="site-title">nostipedia</h1>
-            <div class="header-actions">
-                <button id="compareBtn" class="btn btn-secondary" title="Compare articles">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="18" rx="1"/>
-                        <rect x="14" y="3" width="7" height="18" rx="1"/>
-                    </svg>
-                    Compare
-                </button>
-                <button id="searchBtn" class="btn btn-secondary" title="Search">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.35-4.35"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    </header>
+// Nostr protocol implementation for NIP-54 wiki articles
+class NostrClient {
+    constructor() {
+        this.relays = new Map();
+        this.subscriptions = new Map();
+        this.eventCache = new Map();
+    }
 
-    <div class="container">
-        <aside id="sidebar" class="sidebar">
-            <button id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle sidebar">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="12" x2="21" y2="12"/>
-                    <line x1="3" y1="6" x2="21" y2="6"/>
-                    <line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-            </button>
-            
-            <div class="sidebar-content">
-                <div class="sidebar-section">
-                    <h3>Navigation</h3>
-                    <ul class="nav-list">
-                        <li><a href="#" data-action="home">Home</a></li>
-                        <li><a href="#" data-action="recent">Recent Changes</a></li>
-                        <li><a href="#" data-action="random">Random Article</a></li>
-                    </ul>
-                </div>
+    // Connect to a relay
+    async connectRelay(url) {
+        if (this.relays.has(url)) {
+            return this.relays.get(url);
+        }
 
-                <div class="sidebar-section">
-                    <h3>Relays</h3>
-                    <div id="relayList" class="relay-list"></div>
-                    <button id="addRelayBtn" class="btn btn-small">+ Add Relay</button>
-                </div>
+        return new Promise((resolve, reject) => {
+            try {
+                const ws = new WebSocket(url);
+                const relay = {
+                    url,
+                    ws,
+                    connected: false,
+                    subscriptions: new Set()
+                };
 
-                <div class="sidebar-section">
-                    <h3>Article Info</h3>
-                    <div id="articleInfo" class="article-info">
-                        <p class="info-text">No article selected</p>
-                    </div>
-                </div>
-            </div>
-        </aside>
+                ws.onopen = () => {
+                    relay.connected = true;
+                    this.relays.set(url, relay);
+                    console.log(`Connected to ${url}`);
+                    resolve(relay);
+                };
 
-        <main id="mainContent" class="main-content">
-            <div id="searchPanel" class="search-panel" style="display: none;">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search articles..." class="search-input">
-                    <button id="closeSearchBtn" class="btn-close">×</button>
-                </div>
-                <div id="searchResults" class="search-results"></div>
-            </div>
+                ws.onerror = (err) => {
+                    console.error(`Error connecting to ${url}:`, err);
+                    reject(err);
+                };
 
-            <div id="comparePanel" class="compare-panel" style="display: none;">
-                <div class="compare-controls">
-                    <select id="leftArticleSelect" class="article-select">
-                        <option value="">Select left article...</option>
-                    </select>
-                    <button id="closeCompareBtn" class="btn btn-secondary">Exit Compare</button>
-                    <select id="rightArticleSelect" class="article-select">
-                        <option value="">Select right article...</option>
-                    </select>
-                </div>
-            </div>
+                ws.onclose = () => {
+                    relay.connected = false;
+                    console.log(`Disconnected from ${url}`);
+                };
 
-            <div id="articleContainer" class="article-container">
-                <article id="primaryArticle" class="article">
-                    <div class="article-header">
-                        <h1 id="articleTitle" class="article-title">Welcome to nostipedia</h1>
-                        <div class="article-meta">
-                            <span id="articleAuthor" class="article-author"></span>
-                            <span id="articleDate" class="article-date"></span>
-                        </div>
-                    </div>
-                    <div id="articleContent" class="article-content">
-                        <p>nostipedia is a decentralized wiki powered by Nostr (NIP-54).</p>
-                        <p>Search for an article using the search button above, or explore recent changes from the sidebar.</p>
-                        <h2>Getting Started</h2>
-                        <p>This client connects to Nostr relays to fetch wiki articles. Add your preferred relays in the sidebar to get started.</p>
-                    </div>
-                </article>
+                ws.onmessage = (msg) => {
+                    this.handleMessage(url, msg.data);
+                };
 
-                <article id="secondaryArticle" class="article article-secondary" style="display: none;">
-                    <div class="article-header">
-                        <h1 id="articleTitle2" class="article-title"></h1>
-                        <div class="article-meta">
-                            <span id="articleAuthor2" class="article-author"></span>
-                            <span id="articleDate2" class="article-date"></span>
-                        </div>
-                    </div>
-                    <div id="articleContent2" class="article-content"></div>
-                </article>
-            </div>
+                // Timeout after 5 seconds
+                setTimeout(() => {
+                    if (!relay.connected) {
+                        ws.close();
+                        reject(new Error('Connection timeout'));
+                    }
+                }, 5000);
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
 
-            <div id="loadingIndicator" class="loading" style="display: none;">
-                <div class="spinner"></div>
-                <p>Loading from Nostr relays...</p>
-            </div>
-        </main>
-    </div>
+    // Disconnect from a relay
+    disconnectRelay(url) {
+        const relay = this.relays.get(url);
+        if (relay) {
+            relay.ws.close();
+            this.relays.delete(url);
+        }
+    }
 
-    <div id="addRelayModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h2>Add Relay</h2>
-            <input type="text" id="relayInput" placeholder="wss://relay.example.com" class="input">
-            <div class="modal-actions">
-                <button id="cancelRelayBtn" class="btn btn-secondary">Cancel</button>
-                <button id="confirmRelayBtn" class="btn btn-primary">Add</button>
-            </div>
-        </div>
-    </div>
+    // Handle incoming messages
+    handleMessage(relayUrl, data) {
+        try {
+            const message = JSON.parse(data);
+            const [type, ...rest] = message;
 
-    <script src="/nostr.js"></script>
-    <script src="/app.js"></script>
-</body>
-</html>
+            switch (type) {
+                case 'EVENT':
+                    this.handleEvent(relayUrl, rest[0], rest[1]);
+                    break;
+                case 'EOSE':
+                    this.handleEOSE(rest[0]);
+                    break;
+                case 'NOTICE':
+                    console.log(`Notice from ${relayUrl}:`, rest[0]);
+                    break;
+            }
+        } catch (err) {
+            console.error('Error parsing message:', err);
+        }
+    }
+
+    // Handle event
+    handleEvent(relayUrl, subId, event) {
+        if (!this.verifyEvent(event)) {
+            console.warn('Invalid event signature');
+            return;
+        }
+
+        // Cache event
+        this.eventCache.set(event.id, event);
+
+        // Call subscription callback
+        const sub = this.subscriptions.get(subId);
+        if (sub && sub.callback) {
+            sub.callback(event);
+        }
+    }
+
+    // Handle end of stored events
+    handleEOSE(subId) {
+        const sub = this.subscriptions.get(subId);
+        if (sub && sub.onEOSE) {
+            sub.onEOSE();
+        }
+    }
+
+    // Subscribe to events
+    subscribe(filters, callback, onEOSE) {
+        const subId = this.generateSubId();
+        
+        this.subscriptions.set(subId, {
+            filters,
+            callback,
+            onEOSE
+        });
+
+        // Send REQ to all connected relays
+        const req = JSON.stringify(['REQ', subId, ...filters]);
+        
+        for (const [url, relay] of this.relays) {
+            if (relay.connected) {
+                relay.ws.send(req);
+                relay.subscriptions.add(subId);
+            }
+        }
+
+        return subId;
+    }
+
+    // Unsubscribe
+    unsubscribe(subId) {
+        this.subscriptions.delete(subId);
+
+        const close = JSON.stringify(['CLOSE', subId]);
+        
+        for (const [url, relay] of this.relays) {
+            if (relay.connected && relay.subscriptions.has(subId)) {
+                relay.ws.send(close);
+                relay.subscriptions.delete(subId);
+            }
+        }
+    }
+
+    // Publish event
+    async publishEvent(event) {
+        const signedEvent = await this.signEvent(event);
+        const msg = JSON.stringify(['EVENT', signedEvent]);
+
+        const promises = [];
+        for (const [url, relay] of this.relays) {
+            if (relay.connected) {
+                promises.push(
+                    new Promise((resolve) => {
+                        relay.ws.send(msg);
+                        resolve();
+                    })
+                );
+            }
+        }
+
+        return Promise.all(promises);
+    }
+
+    // Generate subscription ID
+    generateSubId() {
+        return 'sub_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Simple event verification (basic check)
+    verifyEvent(event) {
+        // In production, this should verify the signature
+        // For now, just basic structure validation
+        return (
+            event.id &&
+            event.pubkey &&
+            event.created_at &&
+            event.kind !== undefined &&
+            Array.isArray(event.tags) &&
+            event.content !== undefined
+        );
+    }
+
+    // Sign event (placeholder - in production use NIP-07 or private key)
+    async signEvent(event) {
+        // This is a placeholder. In production:
+        // - Use window.nostr (NIP-07) if available
+        // - Or implement proper signing with private key
+        
+        const eventData = {
+            ...event,
+            id: this.generateEventId(event),
+            sig: 'placeholder_signature'
+        };
+
+        return eventData;
+    }
+
+    // Generate event ID
+    generateEventId(event) {
+        // Simplified - in production use proper SHA256 of serialized event
+        return Array.from(crypto.getRandomValues(new Uint8Array(32)))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+    }
+
+    // Get all connected relays
+    getConnectedRelays() {
+        return Array.from(this.relays.values()).filter(r => r.connected);
+    }
+
+    // Check if relay is connected
+    isRelayConnected(url) {
+        const relay = this.relays.get(url);
+        return relay && relay.connected;
+    }
+}
+
+// NIP-54 specific helpers
+class WikiClient {
+    constructor(nostrClient) {
+        this.nostr = nostrClient;
+        this.KIND_WIKI = 30818; // NIP-54 wiki article kind
+    }
+
+    // Search for wiki articles
+    async searchArticles(query, limit = 20) {
+        return new Promise((resolve, reject) => {
+            const results = [];
+            const timeout = setTimeout(() => {
+                this.nostr.unsubscribe(subId);
+                resolve(results);
+            }, 5000);
+
+            const subId = this.nostr.subscribe(
+                [{
+                    kinds: [this.KIND_WIKI],
+                    limit
+                }],
+                (event) => {
+                    articles.push(this.parseArticle(event));
+                },
+                () => {
+                    clearTimeout(timeout);
+                    this.nostr.unsubscribe(subId);
+                    // Sort by date
+                    articles.sort((a, b) => b.timestamp - a.timestamp);
+                    resolve(articles);
+                }
+            );
+        });
+    }
+
+    // Parse article from event
+    parseArticle(event) {
+        const article = {
+            id: event.id,
+            pubkey: event.pubkey,
+            timestamp: event.created_at,
+            content: event.content,
+            title: '',
+            summary: '',
+            tags: []
+        };
+
+        // Parse tags
+        for (const tag of event.tags) {
+            const [tagName, ...values] = tag;
+            switch (tagName) {
+                case 'd':
+                    article.title = values[0] || '';
+                    break;
+                case 'title':
+                    article.displayTitle = values[0] || '';
+                    break;
+                case 'summary':
+                    article.summary = values[0] || '';
+                    break;
+                case 't':
+                    article.tags.push(values[0]);
+                    break;
+            }
+        }
+
+        // Use displayTitle if available, otherwise use 'd' tag
+        if (!article.title && article.displayTitle) {
+            article.title = article.displayTitle;
+        }
+
+        return article;
+    }
+
+    // Format pubkey for display
+    formatPubkey(pubkey) {
+        if (!pubkey) return 'Unknown';
+        return pubkey.slice(0, 8) + '...' + pubkey.slice(-8);
+    }
+
+    // Format timestamp
+    formatTimestamp(timestamp) {
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    }
+}
+
+// Export for use in app.js
+window.NostrClient = NostrClient;
+window.WikiClient = WikiClient;WIKI],
+                    limit
+                }],
+                (event) => {
+                    const article = this.parseArticle(event);
+                    if (query && article.title.toLowerCase().includes(query.toLowerCase())) {
+                        results.push(article);
+                    } else if (!query) {
+                        results.push(article);
+                    }
+                },
+                () => {
+                    clearTimeout(timeout);
+                    this.nostr.unsubscribe(subId);
+                    resolve(results);
+                }
+            );
+        });
+    }
+
+    // Get article by title
+    async getArticle(title) {
+        return new Promise((resolve, reject) => {
+            let found = null;
+            const timeout = setTimeout(() => {
+                this.nostr.unsubscribe(subId);
+                resolve(found);
+            }, 5000);
+
+            const subId = this.nostr.subscribe(
+                [{
+                    kinds: [this.KIND_WIKI],
+                    '#d': [title]
+                }],
+                (event) => {
+                    found = this.parseArticle(event);
+                },
+                () => {
+                    clearTimeout(timeout);
+                    this.nostr.unsubscribe(subId);
+                    resolve(found);
+                }
+            );
+        });
+    }
+
+    // Get article versions (by different authors)
+    async getArticleVersions(title) {
+        return new Promise((resolve, reject) => {
+            const versions = [];
+            const timeout = setTimeout(() => {
+                this.nostr.unsubscribe(subId);
+                resolve(versions);
+            }, 5000);
+
+            const subId = this.nostr.subscribe(
+                [{
+                    kinds: [this.KIND_WIKI],
+                    '#d': [title]
+                }],
+                (event) => {
+                    versions.push(this.parseArticle(event));
+                },
+                () => {
+                    clearTimeout(timeout);
+                    this.nostr.unsubscribe(subId);
+                    resolve(versions);
+                }
+            );
+        });
+    }
+
+    // Get recent changes
+    async getRecentChanges(limit = 20) {
+        return new Promise((resolve, reject) => {
+            const articles = [];
+            const timeout = setTimeout(() => {
+                this.nostr.unsubscribe(subId);
+                resolve(articles);
+            }, 5000);
+
+            const subId = this.nostr.subscribe(
+                [{
+                    kinds: [this.KIND_
