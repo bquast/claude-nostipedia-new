@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nostipedia - Nostr Wiki</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-content">
+            <h1 class="site-title">nostipedia</h1>
+            <div class="header-actions">
+                <button id="compareBtn" class="btn btn-secondary" title="Compare articles">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="18" rx="1"/>
+                        <rect x="14" y="3" width="7" height="18" rx="1"/>
+                    </svg>
+                    Compare
+                </button>
+                <button id="searchBtn" class="btn btn-secondary" title="Search">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <aside id="sidebar" class="sidebar">
+            <button id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle sidebar">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="6" x2="21" y2="6"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+            </button>
+            
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3>Navigation</h3>
+                    <ul class="nav-list">
+                        <li><a href="#" data-action="home">Home</a></li>
+                        <li><a href="#" data-action="recent">Recent Changes</a></li>
+                        <li><a href="#" data-action="random">Random Article</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>Relays</h3>
+                    <div id="relayList" class="relay-list"></div>
+                    <button id="addRelayBtn" class="btn btn-small">+ Add Relay</button>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>Article Info</h3>
+                    <div id="articleInfo" class="article-info">
+                        <p class="info-text">No article selected</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main id="mainContent" class="main-content">
+            <div id="searchPanel" class="search-panel" style="display: none;">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search articles..." class="search-input">
+                    <button id="closeSearchBtn" class="btn-close">×</button>
+                </div>
+                <div id="searchResults" class="search-results"></div>
+            </div>
+
+            <div id="comparePanel" class="compare-panel" style="display: none;">
+                <div class="compare-controls">
+                    <select id="leftArticleSelect" class="article-select">
+                        <option value="">Select left article...</option>
+                    </select>
+                    <button id="closeCompareBtn" class="btn btn-secondary">Exit Compare</button>
+                    <select id="rightArticleSelect" class="article-select">
+                        <option value="">Select right article...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="articleContainer" class="article-container">
+                <article id="primaryArticle" class="article">
+                    <div class="article-header">
+                        <h1 id="articleTitle" class="article-title">Welcome to nostipedia</h1>
+                        <div class="article-meta">
+                            <span id="articleAuthor" class="article-author"></span>
+                            <span id="articleDate" class="article-date"></span>
+                        </div>
+                    </div>
+                    <div id="articleContent" class="article-content">
+                        <p>nostipedia is a decentralized wiki powered by Nostr (NIP-54).</p>
+                        <p>Search for an article using the search button above, or explore recent changes from the sidebar.</p>
+                        <h2>Getting Started</h2>
+                        <p>This client connects to Nostr relays to fetch wiki articles. Add your preferred relays in the sidebar to get started.</p>
+                    </div>
+                </article>
+
+                <article id="secondaryArticle" class="article article-secondary" style="display: none;">
+                    <div class="article-header">
+                        <h1 id="articleTitle2" class="article-title"></h1>
+                        <div class="article-meta">
+                            <span id="articleAuthor2" class="article-author"></span>
+                            <span id="articleDate2" class="article-date"></span>
+                        </div>
+                    </div>
+                    <div id="articleContent2" class="article-content"></div>
+                </article>
+            </div>
+
+            <div id="loadingIndicator" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Loading from Nostr relays...</p>
+            </div>
+        </main>
+    </div>
+
+    <div id="addRelayModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>Add Relay</h2>
+            <input type="text" id="relayInput" placeholder="wss://relay.example.com" class="input">
+            <div class="modal-actions">
+                <button id="cancelRelayBtn" class="btn btn-secondary">Cancel</button>
+                <button id="confirmRelayBtn" class="btn btn-primary">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/nostr.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>
