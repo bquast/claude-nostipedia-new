@@ -245,77 +245,6 @@ class WikiClient {
                     limit
                 }],
                 (event) => {
-                    articles.push(this.parseArticle(event));
-                },
-                () => {
-                    clearTimeout(timeout);
-                    this.nostr.unsubscribe(subId);
-                    // Sort by date
-                    articles.sort((a, b) => b.timestamp - a.timestamp);
-                    resolve(articles);
-                }
-            );
-        });
-    }
-
-    // Parse article from event
-    parseArticle(event) {
-        const article = {
-            id: event.id,
-            pubkey: event.pubkey,
-            timestamp: event.created_at,
-            content: event.content,
-            title: '',
-            summary: '',
-            tags: []
-        };
-
-        // Parse tags
-        for (const tag of event.tags) {
-            const [tagName, ...values] = tag;
-            switch (tagName) {
-                case 'd':
-                    article.title = values[0] || '';
-                    break;
-                case 'title':
-                    article.displayTitle = values[0] || '';
-                    break;
-                case 'summary':
-                    article.summary = values[0] || '';
-                    break;
-                case 't':
-                    article.tags.push(values[0]);
-                    break;
-            }
-        }
-
-        // Use displayTitle if available, otherwise use 'd' tag
-        if (!article.title && article.displayTitle) {
-            article.title = article.displayTitle;
-        }
-
-        return article;
-    }
-
-    // Format pubkey for display
-    formatPubkey(pubkey) {
-        if (!pubkey) return 'Unknown';
-        return pubkey.slice(0, 8) + '...' + pubkey.slice(-8);
-    }
-
-    // Format timestamp
-    formatTimestamp(timestamp) {
-        const date = new Date(timestamp * 1000);
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-    }
-}
-
-// Export for use in app.js
-window.NostrClient = NostrClient;
-window.WikiClient = WikiClient;WIKI],
-                    limit
-                }],
-                (event) => {
                     const article = this.parseArticle(event);
                     if (query && article.title.toLowerCase().includes(query.toLowerCase())) {
                         results.push(article);
@@ -395,4 +324,75 @@ window.WikiClient = WikiClient;WIKI],
 
             const subId = this.nostr.subscribe(
                 [{
-                    kinds: [this.KIND_
+                    kinds: [this.KIND_WIKI],
+                    limit
+                }],
+                (event) => {
+                    articles.push(this.parseArticle(event));
+                },
+                () => {
+                    clearTimeout(timeout);
+                    this.nostr.unsubscribe(subId);
+                    // Sort by date
+                    articles.sort((a, b) => b.timestamp - a.timestamp);
+                    resolve(articles);
+                }
+            );
+        });
+    }
+
+    // Parse article from event
+    parseArticle(event) {
+        const article = {
+            id: event.id,
+            pubkey: event.pubkey,
+            timestamp: event.created_at,
+            content: event.content,
+            title: '',
+            summary: '',
+            tags: []
+        };
+
+        // Parse tags
+        for (const tag of event.tags) {
+            const [tagName, ...values] = tag;
+            switch (tagName) {
+                case 'd':
+                    article.title = values[0] || '';
+                    break;
+                case 'title':
+                    article.displayTitle = values[0] || '';
+                    break;
+                case 'summary':
+                    article.summary = values[0] || '';
+                    break;
+                case 't':
+                    article.tags.push(values[0]);
+                    break;
+            }
+        }
+
+        // Use displayTitle if available, otherwise use 'd' tag
+        if (!article.title && article.displayTitle) {
+            article.title = article.displayTitle;
+        }
+
+        return article;
+    }
+
+    // Format pubkey for display
+    formatPubkey(pubkey) {
+        if (!pubkey) return 'Unknown';
+        return pubkey.slice(0, 8) + '...' + pubkey.slice(-8);
+    }
+
+    // Format timestamp
+    formatTimestamp(timestamp) {
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    }
+}
+
+// Export for use in app.js
+window.NostrClient = NostrClient;
+window.WikiClient = WikiClient;
